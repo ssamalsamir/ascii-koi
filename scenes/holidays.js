@@ -90,13 +90,17 @@
     const r = rng(23), leaves = scatter(r, 70, [[214, 110, 34], [196, 150, 50], [168, 60, 36], [140, 90, 40]]);
     return {
       paint(g, t) {
-        const { w, h } = api, gy = h * 0.9, s = Math.min(w * 0.2, h * 0.36), x = w * 0.78, y = gy - s * 0.45;
+        /* the turkey walks the yard end to end; it slows at each end, fans its tail and turns */
+        const { w, h } = api, gy = h * 0.9, s = Math.min(w * 0.2, h * 0.36), u = t * 0.035 * TAU;
+        const x = w * (0.5 + 0.34 * Math.sin(u)), dir = Math.cos(u) >= 0 ? 1 : -1, moving = clamp(Math.abs(Math.cos(u)) * 3, 0, 1);
+        const step = Math.sin(t * 7) * moving, y = gy - s * 0.45 - Math.abs(step) * s * 0.015;
         g.fillStyle = draw.vgrad(g, gy, h, [150, 110, 60], [110, 76, 40], 0.35, 0.5); g.fillRect(0, gy, w, h - gy);
         /* pumpkins and gourds by the turkey's feet */
         draw.ell(g, w * 0.88, gy - s * 0.08, s * 0.13, s * 0.1, 0, draw.lit(g, w * 0.88, gy - s * 0.08, s * 0.13, [226, 120, 30], 0.3));
         draw.ell(g, w * 0.55, gy - s * 0.05, s * 0.09, s * 0.07, 0, draw.lit(g, w * 0.55, gy - s * 0.05, s * 0.09, [214, 170, 60], 0.3));
         /* the strut: every few seconds the tail fans wide and the body puffs up */
-        const strut = clamp(Math.sin(t * 0.5) * 1.6, 0, 1), span = lerp(1.6, 2.9, strut), R = s * lerp(0.62, 0.78, strut);
+        g.save(); g.translate(x, 0); g.scale(dir, 1); g.translate(-x, 0);
+        const strut = 1 - moving, span = lerp(1.6, 2.9, strut), R = s * lerp(0.62, 0.78, strut);
         const fx = x - s * 0.08, fy = y - s * 0.1, N = 15;
         for (const [k, c] of [[1, TIP], [0.9, [70, 40, 22]], [0.82, RUST], [0.6, BRONZE]]) {
           for (let i = 0; i < N; i++) {
@@ -105,7 +109,7 @@
           }
         }
         /* legs, body, wing */
-        for (const e of [-1, 1]) draw.limb(g, x + e * s * 0.06, y + s * 0.2, x + e * s * 0.08, gy, s * 0.035, s * 0.025, css([200, 120, 60]));
+        for (const e of [-1, 1]) draw.limb(g, x + e * s * 0.06, y + s * 0.2, x + e * s * 0.08 + e * step * s * 0.07, gy, s * 0.035, s * 0.025, css([200, 120, 60]));
         const puff = 1 + strut * 0.06;
         draw.ell(g, x, y, s * 0.3 * puff, s * 0.26 * puff, 0, draw.lit(g, x, y, s * 0.3, BRONZE, 0.3));
         draw.ell(g, x - s * 0.05, y + s * 0.02, s * 0.2, s * 0.13, 0.3, draw.lit(g, x, y, s * 0.2, RUST, 0.3));
@@ -117,7 +121,8 @@
         const sw = Math.sin(t * 2.4) * s * 0.03;
         draw.limb(g, hx + s * 0.03, hy + s * 0.04, hx + s * 0.02 + sw, hy + s * 0.13, s * 0.04, s * 0.03, css(WATTLE));
         draw.limb(g, hx + s * 0.05, hy - s * 0.03, hx + s * 0.09 + sw * 0.5, hy + s * 0.06, s * 0.02, s * 0.015, css(WATTLE));
-        api.glyph(hx + s * 0.02, hy - s * 0.01, "o", [20, 20, 20], 1);
+        g.restore();
+        api.glyph(x + dir * (hx + s * 0.02 - x), hy - s * 0.01, "o", [20, 20, 20], 1);
         fall(api, leaves, t, 0.03, ["*", "~", ",", "'"]);
       }
     };
