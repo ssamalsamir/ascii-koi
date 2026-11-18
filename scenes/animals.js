@@ -1,6 +1,6 @@
 /*
- * The animals: big cats and an elephant walking the savanna, a deer in the
- * woods, a cat on a wall at night, a murmuration of birds and a bloom of
+ * The animals: big cats and an elephant roaming the savanna, a deer in a
+ * clearing, a cat walking a wall at night, a murmuration of birds and a bloom of
  * jellyfish. Each is painted with canvas shapes in viewport pixels and turned
  * into character cells by scene.js.
  *
@@ -33,25 +33,38 @@
   const LEGS = [{ hind: true, far: false, off: 0 }, { hind: false, far: false, off: 0.25 }, { hind: true, far: true, off: 0.5 }, { hind: false, far: true, off: 0.75 }];
 
   /*
-   * One walker on the ground: walks for a while, stands for a while (grazing, looking),
-   * and wraps round the screen. Returns the pose for the rig.
+   * The land is seen from a little above: depth z runs from the horizon (0) to the
+   * front edge (1), and a walker further back stands higher on the screen and smaller.
+   */
+  const HORIZON = 0.6;
+  const depth = z => 0.42 + 0.58 * z;
+  const groundY = (h, z) => lerp(h * HORIZON, h * 0.97, z);
+
+  /*
+   * One walker roaming the land: it heads for a spot well across the screen, near or
+   * far, stands there a while (grazing, looking), then picks the next. x and z arrive
+   * together, so it walks a straight line on the ground. A flat walker keeps its depth
+   * (the cat on the wall). Returns the pose for the rig.
    */
   function walker(r, o) {
-    const m = { x: o.x, dir: o.dir || 1, phase: r(), walk: 1, want: 1, until: o.walkFor ? o.walkFor[0] : 9, graze: 0 };
+    const m = { x: o.x, z: o.z ?? 0.7, tx: o.x, tz: o.z ?? 0.7, dir: 1, phase: r(), walk: 0, want: 0, until: 0.5, graze: 0 };
     m.step = (dt, t, w, L) => {
-      if (t > m.until) {
-        m.want = m.want ? 0 : 1;
-        const span = m.want ? o.walkFor || [8, 14] : o.standFor || [3, 6];
-        m.until = t + lerp(span[0], span[1], r());
+      const s = depth(m.z), dx = m.tx - m.x;
+      if (m.want && Math.abs(dx) < 2) {
+        m.want = 0;
+        m.until = t + lerp((o.standFor || [2, 5])[0], (o.standFor || [2, 5])[1], r());
+      } else if (!m.want && t > m.until) {
+        const side = m.x < w / 2 ? 1 : -1;
+        m.tx = clamp(m.x + side * w * (0.3 + r() * 0.5), w * 0.08, w * 0.92);
+        m.tz = o.flat ? m.z : 0.35 + r() * 0.65;
+        m.want = 1;
       }
+      if (m.want && Math.abs(dx) >= 2) m.dir = Math.sign(dx);
       m.walk += (m.want - m.walk) * Math.min(1, dt * 1.6);
       m.graze += ((m.want ? 0 : o.grazes ? 1 : 0) - m.graze) * Math.min(1, dt * 0.9);
-      const v = o.speed * L * m.walk;
-      m.x += v * m.dir * dt;
-      m.phase += dt * v * 0.6 / (o.stride * L);
-      const edge = L * 1.4;
-      if (m.x > w + edge) m.x = -edge;
-      if (m.x < -edge) m.x = w + edge;
+      const d = Math.min(Math.abs(dx), o.speed * L * s * m.walk * dt);
+      if (Math.abs(dx) >= 1) { m.z += (m.tz - m.z) * d / Math.abs(dx); m.x += Math.sign(dx) * d; }
+      m.phase += d * 0.6 / (o.stride * L * s);
     };
     return m;
   }
@@ -99,13 +112,13 @@
   /* the ground the walkers stand on: a soft band of earth with tufts of grass */
   function ground(g, api, gy, earth, grass, t, seed) {
     const w = api.w, h = api.h;
-    g.fillStyle = draw.vgrad(g, gy - h * 0.02, h, earth, mix(earth, [0, 0, 0], 0.4), 0.3, 0.45);
+    g.fillStyle = draw.vgrad(g, gy, h, earth, mix(earth, [0, 0, 0], 0.4), 0.08, 0.28);
     g.fillRect(0, gy, w, h - gy);
     const r = rng(seed);
     for (let i = 0; i < w / 14; i++) {
-      const x = r() * w, y = gy + r() * (h - gy) * 0.8, hgt = (8 + r() * 18) * (0.6 + (y - gy) / (h - gy));
+      const x = r() * w, y = gy + r() * (h - gy), hgt = (8 + r() * 18) * (0.3 + 0.9 * (y - gy) / (h - gy));
       const sway = Math.sin(t * 1.3 + x * 0.01) * 3;
-      draw.limb(g, x, y, x + sway + (r() - 0.5) * 6, y - hgt, 3, 1, css(grass, 0.5));
+      draw.limb(g, x, y, x + sway + (r() - 0.5) * 6, y - hgt, 3, 1, css(grass, 0.6));
     }
   }
 
@@ -120,10 +133,10 @@
   /* the savanna under the big animals */
   function savanna(api, seed) {
     return (g, t) => {
-      const { w, h } = api, gy = h * 0.86, far = mix(api.P.water, [150, 120, 70], 0.4);
+      const { w, h } = api, gy = h * HORIZON, far = mix(api.P.water, [150, 120, 70], 0.4);
       g.globalAlpha = 0.5;
-      acacia(g, w * 0.1, gy, h * 0.3, far);
-      acacia(g, w * 0.9, gy, h * 0.22, far);
+      acacia(g, w * 0.1, gy + h * 0.02, h * 0.22, far);
+      acacia(g, w * 0.88, gy + h * 0.01, h * 0.16, far);
       g.globalAlpha = 1;
       /* a low sun over the horizon */
       draw.ell(g, w * 0.82, h * 0.2, h * 0.07, h * 0.07, 0, draw.lit(g, w * 0.82, h * 0.2, h * 0.07, [240, 170, 90], 0.25));
@@ -159,13 +172,14 @@
     }
   });
   K.scenes.tiger = api => {
-    const r = rng(7), land = savanna(api, 7), m = walker(r, { x: 0, speed: 0.5, stride: 0.34, walkFor: [10, 16], standFor: [3, 5] });
+    const r = rng(7), land = savanna(api, 7), m = walker(r, { x: api.w * 0.2, speed: 0.5, stride: 0.32, standFor: [2, 4] });
     let last = 0;
     return {
       paint(g, t) {
-        const gy = land(g, t), L = Math.min(api.w * 0.3, api.h * 0.6);
+        land(g, t);
+        const L = Math.min(api.w * 0.26, api.h * 0.5);
         m.step(t - last, t, api.w, L); last = t;
-        tigerRig(g, m.x, gy + api.h * 0.04, L, m.dir, m, t);
+        tigerRig(g, m.x, groundY(api.h, m.z), L * depth(m.z), m.dir, m, t);
       }
     };
   };
@@ -195,13 +209,14 @@
     }
   });
   K.scenes.lion = api => {
-    const r = rng(11), land = savanna(api, 11), m = walker(r, { x: api.w * 0.2, speed: 0.4, stride: 0.34, walkFor: [8, 12], standFor: [4, 7] });
+    const r = rng(11), land = savanna(api, 11), m = walker(r, { x: api.w * 0.7, speed: 0.4, stride: 0.34, standFor: [3, 6] });
     let last = 0;
     return {
       paint(g, t) {
-        const gy = land(g, t), L = Math.min(api.w * 0.28, api.h * 0.52);
+        land(g, t);
+        const L = Math.min(api.w * 0.25, api.h * 0.48);
         m.step(t - last, t, api.w, L); last = t;
-        lionRig(g, m.x, gy + api.h * 0.04, L, m.dir, m, t);
+        lionRig(g, m.x, groundY(api.h, m.z), L * depth(m.z), m.dir, m, t);
       }
     };
   };
@@ -232,15 +247,23 @@
   });
   K.scenes.elephant = api => {
     const r = rng(5), land = savanna(api, 5);
-    const mom = walker(r, { x: api.w * 0.25, speed: 0.22, stride: 0.26, walkFor: [12, 18], standFor: [4, 6], grazes: true });
+    const mom = walker(r, { x: api.w * 0.3, z: 0.5, speed: 0.22, stride: 0.26, standFor: [3, 6], grazes: true });
+    /* the calf keeps to her heel, a little nearer the front, and hurries when she gets ahead */
+    const calf = { x: api.w * 0.2, z: 0.6, dir: 1, phase: 0.3, walk: 0, graze: 0 };
     let last = 0;
     return {
       paint(g, t) {
-        const gy = land(g, t), L = Math.min(api.w * 0.22, api.h * 0.36), dt = t - last; last = t;
+        land(g, t);
+        const L = Math.min(api.w * 0.22, api.h * 0.36), dt = t - last; last = t;
         mom.step(dt, t, api.w, L);
-        const calf = { phase: mom.phase * 1.4 + 0.3, walk: mom.walk, graze: mom.graze };
-        elephantRig(g, mom.x - L * 0.75, gy + api.h * 0.07, L * 0.5, mom.dir, calf, t + 1);
-        elephantRig(g, mom.x, gy + api.h * 0.035, L, mom.dir, mom, t);
+        const k = Math.min(1, dt * 0.8), tx = mom.x - mom.dir * L * 0.8 * depth(mom.z), mx = (tx - calf.x) * k;
+        calf.x += mx; calf.z += (Math.min(1, mom.z + 0.12) - calf.z) * k;
+        if (Math.abs(mx) > 0.05) calf.dir = Math.sign(mx);
+        calf.walk += (clamp(Math.abs(mx) / (dt * L * 0.05 + 1e-6), 0, 1) - calf.walk) * Math.min(1, dt * 2);
+        calf.phase += Math.abs(mx) * 0.6 / (0.26 * L * 0.5 * depth(calf.z));
+        calf.graze = mom.graze;
+        const herd = [[mom, L, t], [calf, L * 0.5, t + 1]].sort((a, b) => a[0].z - b[0].z);
+        for (const [e, size, te] of herd) elephantRig(g, e.x, groundY(api.h, e.z), size * depth(e.z), e.dir, e, te);
       }
     };
   };
@@ -275,21 +298,22 @@
     }
   });
   K.scenes.deer = api => {
-    const r = rng(3), m = walker(r, { x: api.w * 0.3, speed: 0.3, stride: 0.38, walkFor: [5, 8], standFor: [6, 10], grazes: true });
+    const r = rng(3), m = walker(r, { x: api.w * 0.3, speed: 0.32, stride: 0.38, standFor: [3, 7], grazes: true });
     const trees = Array.from({ length: 14 }, () => ({ x: r(), depth: r(), w: 0.6 + r() * 0.8 }));
     const leaves = Array.from({ length: 50 }, () => ({ x: r(), y: r(), s: 0.4 + r() * 0.6, c: [[214, 120, 40], [200, 160, 60], [170, 70, 40]][(r() * 3) | 0], p: r() * TAU }));
     let last = 0;
     return {
       paint(g, t) {
-        const { w, h, P } = api, gy = h * 0.86, dt = t - last; last = t;
-        for (const tr of trees.slice().sort((a, b) => a.depth - b.depth)) {
-          const c = mix(P.water, [90, 70, 55], 0.2 + tr.depth * 0.5), tw = (14 + tr.depth * 26) * tr.w;
-          draw.limb(g, tr.x * w, gy + 10, tr.x * w + 4, -20, tw, tw * 0.7, css(c, 0.25 + tr.depth * 0.25));
-        }
+        const { w, h, P } = api, gy = h * HORIZON, dt = t - last; last = t;
         ground(g, api, gy, [80, 90, 50], [120, 140, 70], t, 3);
-        const L = Math.min(api.w * 0.22, api.h * 0.36);
+        /* the trees stand at the back of the clearing, the nearer ones darker and wider */
+        for (const tr of trees.slice().sort((a, b) => a.depth - b.depth)) {
+          const c = mix(P.water, [90, 70, 55], 0.2 + tr.depth * 0.5), tw = (10 + tr.depth * 22) * tr.w, base = gy + tr.depth * h * 0.06;
+          draw.limb(g, tr.x * w, base, tr.x * w + 4, -20, tw, tw * 0.7, css(c, 0.25 + tr.depth * 0.25));
+        }
+        const L = Math.min(api.w * 0.22, api.h * 0.38);
         m.step(dt, t, w, L);
-        deerRig(g, m.x, gy + h * 0.04, L, m.dir, m, t);
+        deerRig(g, m.x, groundY(h, m.z), L * depth(m.z), m.dir, m, t);
         for (const f of leaves) {
           const y = ((f.y + t * 0.03 * f.s) % 1) * h, x = (f.x * w + Math.sin(t * 0.8 + f.p) * 30 + w) % w;
           api.glyph(x, y, Math.sin(t * 2 + f.p) > 0 ? "*" : "~", f.c, 0.5 + 0.4 * f.s);
@@ -298,37 +322,46 @@
     };
   };
 
-  /* ── a cat on a wall at night, watching the fireflies ── */
-  const GINGER = [214, 138, 66], GINGER_DARK = [150, 84, 36];
+  /* ── a cat walking along a wall at night, under the fireflies ── */
+  const GINGER = [214, 138, 66], GINGER_DARK = [150, 84, 36], GINGER_PALE = [246, 226, 196];
+  const catRig = beast({
+    leg: 0.4, bodyH: 0.15, bodyY: 0.5, shoulder: 0.3, hip: -0.3, legW: 0.08, footW: 0.07, stride: 0.3, lift: 0.08, bob: 0.01,
+    col: GINGER, far: mix(GINGER, [0, 0, 0], 0.35),
+    /* a cat walks with its tail up, the tip curling */
+    tail(g, { by, t }) {
+      const pts = tailPts(-0.46, by - 0.06, 0.62, -1.4, 0.35, t);
+      pts.forEach((p, i) => i && draw.limb(g, pts[i - 1][0], pts[i - 1][1], p[0], p[1], 0.065, 0.055, css(i % 2 ? GINGER : GINGER_DARK)));
+    },
+    coat(g, { by }) {
+      g.save(); g.beginPath(); g.ellipse(0, by, 0.5, 0.15, 0, 0, TAU); g.clip();
+      draw.ell(g, 0.05, by + 0.13, 0.42, 0.06, 0, css(GINGER_PALE));
+      for (let i = 0; i < 7; i++) { const x = -0.36 + i * 0.11; draw.limb(g, x, by - 0.16, x + 0.04, by + 0.02, 0.035, 0.015, css(GINGER_DARK)); }
+      g.restore();
+    },
+    neck(g, { by, t }) {
+      const hx = 0.58, hy = by - 0.2 + Math.sin(t * 0.9) * 0.01;
+      draw.limb(g, 0.34, by - 0.04, hx - 0.04, hy + 0.04, 0.17, 0.13, css(GINGER));
+      g.fillStyle = css(GINGER);
+      for (const e of [-1, 1]) { g.beginPath(); g.moveTo(hx + e * 0.1, hy - 0.04); g.lineTo(hx + e * 0.08 + 0.02, hy - 0.2); g.lineTo(hx + e * 0.01, hy - 0.08); g.fill(); }
+      draw.ell(g, hx, hy, 0.13, 0.11, 0, draw.lit(g, hx, hy, 0.13, GINGER, 0.3));
+      draw.ell(g, hx + 0.08, hy + 0.04, 0.06, 0.045, 0, css(GINGER_PALE));
+      draw.ell(g, hx + 0.13, hy + 0.02, 0.018, 0.014, 0, css([220, 120, 120]));
+      draw.ell(g, hx + 0.05, hy - 0.025, 0.022, 0.018, 0, css([170, 210, 80]));
+    }
+  });
   K.scenes.cat = api => {
     const r = rng(9), flies = Array.from({ length: 16 }, () => ({ x: r(), y: 0.3 + r() * 0.5, p: r() * TAU, s: 0.5 + r() }));
+    const m = walker(r, { x: api.w * 0.3, z: 1, flat: true, speed: 0.5, stride: 0.3, standFor: [2, 6] });
+    let last = 0;
     return {
       paint(g, t) {
-        const { w, h, P } = api, s = Math.min(w * 0.22, h * 0.42), cx = w * 0.72, wy = h * 0.8;
+        const { w, h, P } = api, wy = h * 0.8, L = Math.min(w * 0.17, h * 0.34);
         /* the moon, the wall */
         draw.ell(g, w * 0.86, h * 0.18, h * 0.08, h * 0.08, 0, draw.lit(g, w * 0.86, h * 0.18, h * 0.08, [236, 230, 206], 0.2));
-        const wall = mix(P.water, [120, 110, 100], 0.35);
-        g.fillStyle = css(wall, 0.5); g.fillRect(0, wy, w, h - wy);
+        g.fillStyle = css(mix(P.water, [120, 110, 100], 0.35), 0.5); g.fillRect(0, wy, w, h - wy);
         for (let y = wy + 4, row = 0; y < h; y += 26, row++) for (let x = (row % 2) * 30; x < w; x += 60) g.clearRect(x, y, 2, 24);
-        /* breath, a slow blink, the tail hanging over the edge */
-        const br = 1 + Math.sin(t * 1.6) * 0.015;
-        const tail = [];
-        for (let i = 0; i < 9; i++) { const k = i / 8; tail.push([cx - s * 0.18 + Math.sin(t * 1.1 - k * 2.5) * s * 0.1 * k, wy + k * s * 0.55]); }
-        draw.chain(g, tail, s * 0.07, s * 0.05, css(GINGER));
-        draw.ell(g, cx, wy - s * 0.3 * br, s * 0.24, s * 0.32 * br, 0, draw.lit(g, cx, wy - s * 0.3, s * 0.3, GINGER, 0.3));
-        draw.ell(g, cx + s * 0.08, wy - s * 0.25, s * 0.12, s * 0.22, 0, css(mix(GINGER, [250, 236, 214], 0.55)));
-        for (let i = 0; i < 4; i++) draw.limb(g, cx - s * 0.2, wy - s * (0.1 + i * 0.12), cx - s * 0.05, wy - s * (0.12 + i * 0.12), s * 0.03, s * 0.015, css(GINGER_DARK));
-        draw.ell(g, cx + s * 0.1, wy - s * 0.03, s * 0.08, s * 0.04, 0, css(GINGER));
-        /* the head drifts a little, following the fireflies */
-        const hx = cx + s * (0.03 + Math.sin(t * 0.3) * 0.02), hy = wy - s * 0.72;
-        for (const e of [-1, 1]) {
-          g.fillStyle = css(GINGER); g.beginPath();
-          g.moveTo(hx + e * s * 0.16, hy - s * 0.02); g.lineTo(hx + e * s * 0.13, hy - s * 0.22); g.lineTo(hx + e * s * 0.02, hy - s * 0.1); g.fill();
-        }
-        draw.ell(g, hx, hy, s * 0.17, s * 0.14, 0, draw.lit(g, hx, hy, s * 0.17, GINGER, 0.3));
-        draw.ell(g, hx, hy + s * 0.06, s * 0.08, s * 0.05, 0, css(mix(GINGER, [250, 236, 214], 0.6)));
-        const blink = (t % 6) < 0.25;
-        for (const e of [-1, 1]) api.glyph(hx + e * s * 0.07, hy - s * 0.01, blink ? "-" : "o", [180, 220, 90], 1);
+        m.step(t - last, t, w, L); last = t;
+        catRig(g, m.x, wy, L, m.dir, m, t);
         for (const f of flies) {
           const x = (f.x + 0.05 * Math.sin(t * 0.3 * f.s + f.p)) * w, y = (f.y + 0.04 * Math.sin(t * 0.5 * f.s + f.p * 2)) * h;
           api.glyph(x, y, "·", [230, 240, 120], clamp(Math.sin(t * f.s * 1.5 + f.p), 0, 1));
@@ -347,7 +380,7 @@
       paint(g, t) {
         const { w, h, P } = api, dt = Math.min(0.05, t - last); last = t;
         /* the flock chases a slowly wandering point; neighbours keep apart and match speed */
-        const gx = w * (0.5 + 0.32 * Math.sin(t * 0.13) + 0.1 * Math.sin(t * 0.31)), gyy = h * (0.32 + 0.14 * Math.sin(t * 0.21));
+        const gx = w * (0.5 + 0.34 * Math.sin(t * 0.11) + 0.1 * Math.sin(t * 0.29)), gyy = h * (0.38 + 0.24 * Math.sin(t * 0.17));
         for (const b of flock) {
           let sx = 0, sy = 0, ax = 0, ay = 0, n = 0;
           for (const o of flock) {
@@ -395,7 +428,9 @@
           /* a quick squeeze, then a slow relax; the squeeze pushes the bell up */
           const squeeze = ph < 0.3 ? Math.sin(Math.PI * ph / 0.3) : 0;
           j.vy += (-squeeze * 42 * j.s + 7) * dt; j.vy *= 1 - dt * 0.9; j.vx *= 1 - dt * 0.6;
-          j.y += j.vy * dt / h; j.x += (j.vx * dt + Math.sin(t * 0.1 + j.p) * 4 * dt) / w;
+          /* each drifts on its own slow current, so the bloom spreads over the whole screen */
+          const current = (noise1(t * 0.04 + j.p * 7, 5) - 0.5) * 90;
+          j.y += j.vy * dt / h; j.x += (j.vx + current) * dt / w;
           if (j.y < -0.25) j.y = 1.2; if (j.y > 1.25) j.y = -0.2;
           j.x = ((j.x % 1) + 1) % 1;
           const x = j.x * w, y = j.y * h, rx = R * (1 - 0.18 * squeeze), ry = R * (1.05 + 0.15 * squeeze);
