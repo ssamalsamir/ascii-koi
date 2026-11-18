@@ -5,11 +5,14 @@
  *   ?theme=pond|black|light    the water (remembered when you switch)
  *   ?title=One%20Page&tag=is%20all%20you%20need   your own words instead of the clock
  *   ?ui=0                       no controls (for a wallpaper or a recording)
+ *   ?scene=koi|birds|cat|deer|jellyfish|tiger|elephant|lion|halloween|turkey|tree|newyear
+ *                               one scene always; without it the calendar picks (scene.js)
+ *   ?fps=30                     frames a second at most (30 by default: kinder to a battery)
  *   keys: 1 2 3 or T for the water, space to pause
  */
 (() => {
   "use strict";
-  const { createPond, AsciiMark } = window.AsciiKoi;
+  const { createPond, createScene, pickScene, scenes, AsciiMark } = window.AsciiKoi;
   const root = document.documentElement;
   const q = new URLSearchParams(location.search);
   const THEMES = ["pond", "black", "light"];
@@ -42,11 +45,20 @@
     dark: cssVar("color-scheme").includes("dark")
   });
 
-  const pond = createPond({
-    canvas: pondCanvas, palette, reduce,
+  /* the scene: the one asked for, or the one the calendar picks; a wallpaper left open moves on when the day does */
+  const asked = q.get("scene");
+  const sceneName = () => asked === "koi" || scenes[asked] ? asked : pickScene(new Date());
+  const scene = sceneName();
+  if (!asked) setInterval(() => { if (sceneName() !== scene) location.reload(); }, 60e3);
+  const fps = Math.min(120, Math.max(5, +q.get("fps") || 30));
+  const sceneOpts = {
+    canvas: pondCanvas, palette, reduce, fps,
     /* the title's box in pond pixels: the koi fade under it, so the letters can wear their colour */
     dim: () => { const r = box.getBoundingClientRect(); return r.width ? r : null; }
-  });
+  };
+  const pond = scene === "koi" ? createPond(sceneOpts) : createScene(scene, sceneOpts);
+  /* the paw and the food are the pond's; elsewhere a click is the scene's own */
+  if (scene !== "koi") for (const e of document.querySelectorAll(".hint .mouse, .hint .touch")) e.hidden = true;
   pond.size(innerWidth, innerHeight);
   window.AsciiKoi.pond = pond;
 

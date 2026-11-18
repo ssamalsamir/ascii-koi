@@ -855,6 +855,8 @@
      * waiting for the GPU to finish the frame before.
      */
     let last = 0, drawn = 0, running = false, dirty = true;
+    /* a host can ask for fewer frames (?fps=30 in app.js): the pond still moves by time, it is drawn less often */
+    const frameMs = opts.fps ? 1000 / opts.fps - 2 : 12;
     function frame(now) {
       if (!running) return;
       requestAnimationFrame(frame);
@@ -863,7 +865,7 @@
       const moving = !paused && !reduce;
       if (moving && dt > 0) advance(dt);
       if (!moving && !dirty) return;
-      if (now - drawn < 12 && !dirty) return;
+      if (now - drawn < frameMs && !dirty) return;
       dirty = false;
       drawn = now;
       render();
