@@ -189,7 +189,6 @@
       }
     };
     return {
-      poke(x, y) { burst(x, y); },
       paint(g, t) {
         const { w, h, P } = api, dt = Math.min(0.05, t - last); last = t;
         if (t > next) { rockets.push({ x: w * (0.1 + r() * 0.8), y: h, vy: -(h * 0.75 + r() * h * 0.35), top: h * (0.12 + r() * 0.3) }); next = t + 0.35 + r() * 0.8; }

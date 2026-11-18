@@ -1,6 +1,6 @@
 // Render time per frame in each water: node scripts/bench.mjs [url]
 import { launch } from "./cdp.mjs";
-const url = process.argv[2] || new URL("../index.html?ui=0", import.meta.url).href;
+const url = process.argv[2] || new URL("../index.html", import.meta.url).href;
 const gpu = process.argv.includes("--gpu");
 const b = await launch({ width: 1440, height: 900, dpr: 2, args: gpu ? ["--enable-gpu", "--use-angle=metal"] : [] });
 await b.goto(url);

@@ -302,9 +302,7 @@
   const GINGER = [214, 138, 66], GINGER_DARK = [150, 84, 36];
   K.scenes.cat = api => {
     const r = rng(9), flies = Array.from({ length: 16 }, () => ({ x: r(), y: 0.3 + r() * 0.5, p: r() * TAU, s: 0.5 + r() }));
-    let look = null;
     return {
-      poke(x, y, t) { look = { x, y, at: t }; },
       paint(g, t) {
         const { w, h, P } = api, s = Math.min(w * 0.22, h * 0.42), cx = w * 0.72, wy = h * 0.8;
         /* the moon, the wall */
@@ -321,9 +319,8 @@
         draw.ell(g, cx + s * 0.08, wy - s * 0.25, s * 0.12, s * 0.22, 0, css(mix(GINGER, [250, 236, 214], 0.55)));
         for (let i = 0; i < 4; i++) draw.limb(g, cx - s * 0.2, wy - s * (0.1 + i * 0.12), cx - s * 0.05, wy - s * (0.12 + i * 0.12), s * 0.03, s * 0.015, css(GINGER_DARK));
         draw.ell(g, cx + s * 0.1, wy - s * 0.03, s * 0.08, s * 0.04, 0, css(GINGER));
-        /* the head turns toward the last click, then drifts back to the fireflies */
-        const k = look ? Math.exp(-(t - look.at) / 4) : 0, tx = look ? clamp((look.x - cx) / w, -0.5, 0.5) : 0;
-        const hx = cx + s * (0.03 + tx * 0.12 * k + Math.sin(t * 0.3) * 0.02), hy = wy - s * 0.72;
+        /* the head drifts a little, following the fireflies */
+        const hx = cx + s * (0.03 + Math.sin(t * 0.3) * 0.02), hy = wy - s * 0.72;
         for (const e of [-1, 1]) {
           g.fillStyle = css(GINGER); g.beginPath();
           g.moveTo(hx + e * s * 0.16, hy - s * 0.02); g.lineTo(hx + e * s * 0.13, hy - s * 0.22); g.lineTo(hx + e * s * 0.02, hy - s * 0.1); g.fill();
@@ -347,9 +344,6 @@
     const wire = Array.from({ length: 9 }, () => ({ x: r(), hop: r() * 20 }));
     let last = 0;
     return {
-      poke(x, y) {
-        for (const b of flock) { const dx = b.x - x, dy = b.y - y, d = Math.hypot(dx, dy) + 1; if (d < 260) { b.vx += dx / d * 420; b.vy += dy / d * 420; } }
-      },
       paint(g, t) {
         const { w, h, P } = api, dt = Math.min(0.05, t - last); last = t;
         /* the flock chases a slowly wandering point; neighbours keep apart and match speed */
@@ -393,9 +387,6 @@
     const snow = Array.from({ length: 120 }, () => ({ x: r(), y: r(), s: r() }));
     let last = 0;
     return {
-      poke(x, y) {
-        for (const j of jellies) { const dx = j.x * api.w - x, dy = j.y * api.h - y, d = Math.hypot(dx, dy) + 1; if (d < 300) { j.vx += dx / d * 120; j.vy += dy / d * 120; } }
-      },
       paint(g, t) {
         const { w, h, P } = api, dt = Math.min(0.05, t - last); last = t;
         for (const m of snow) api.glyph(m.x * w + Math.sin(t * 0.2 + m.s * 9) * 10, ((m.y + t * 0.006 * (0.3 + m.s)) % 1) * h, "·", P.ink, 0.15 + m.s * 0.2);

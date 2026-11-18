@@ -12,7 +12,7 @@
  * The calendar picks the scene: Halloween, Thanksgiving, Christmas and New
  * Year in season, and one animal a day the rest of the year.
  *
- * Scenes register themselves in AsciiKoi.scenes[name] = api => ({ paint(g, t, dt), poke?(x, y) }).
+ * Scenes register themselves in AsciiKoi.scenes[name] = api => ({ paint(g, t) }).
  */
 (function (global) {
   "use strict";
@@ -238,8 +238,6 @@
       pause(v) { paused = v === undefined ? !paused : !!v; dirty = true; return paused; },
       get paused() { return paused; },
       get time() { return t; },
-      paw: (x, y) => { scene.poke && scene.poke(x, y, t); dirty = true; },
-      feed: (x, y) => { scene.poke && scene.poke(x, y, t); dirty = true; },
       tint: () => null,
       light: () => 0
     };
