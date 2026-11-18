@@ -143,6 +143,8 @@
     }
 
     function render() {
+      /* a minimised window has no cells to draw */
+      if (!cols || !rows) return;
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, pc.width, pc.height);
       g.setTransform(S / cw, 0, 0, S / ch, 0, 0);
@@ -222,7 +224,8 @@
     }
 
     return {
-      size(w, h) { size(w, h); },
+      /* the colours come with the size, as in the pond: a scene never draws without them */
+      size(w, h) { size(w, h); colors(); },
       colors,
       render,
       start() {

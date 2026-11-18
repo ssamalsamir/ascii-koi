@@ -47,7 +47,7 @@
 
   /* the scene: the one asked for, or the one the calendar picks; a wallpaper left open moves on when the day does */
   const asked = q.get("scene");
-  const sceneName = () => asked === "koi" || scenes[asked] ? asked : pickScene(new Date());
+  const sceneName = () => asked === "koi" || Object.hasOwn(scenes, asked) ? asked : pickScene(new Date());
   const scene = sceneName();
   if (!asked) setInterval(() => { if (sceneName() !== scene) location.reload(); }, 60e3);
   const fps = Math.min(120, Math.max(5, +q.get("fps") || 30));
@@ -208,5 +208,5 @@
   pond.start();
   buildWords().then(() => { box.classList.add("go"); requestAnimationFrame(frame); });
   /* canvas text cannot trigger a webfont load; redraw once the mono face is in */
-  document.fonts?.load(`600 12px "Geist Mono"`).then(() => pond.colors());
+  document.fonts?.load(`600 12px "Geist Mono"`).then(() => pond.colors(), () => { /* drawn with the fallback font */ });
 })();
