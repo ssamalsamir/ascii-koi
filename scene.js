@@ -10,9 +10,10 @@
  * and ask for a glyph in a cell directly.
  *
  * The calendar picks the scene: Halloween, Thanksgiving, Christmas and New
- * Year in season, and one animal a day the rest of the year.
+ * Year for the five days before each and the day itself, and one animal a
+ * day the rest of the year.
  *
- * Scenes register themselves in AsciiKoi.scenes[name] = api => ({ paint(g, t) }).
+ * Scenes register themselves in AsciiKoi.scenes[name] = api => ({ paint(g, t, P) }).
  */
 (function (global) {
   "use strict";
@@ -80,18 +81,19 @@
   const ANIMALS = ["koi", "birds", "cat", "deer", "jellyfish", "tiger", "elephant", "lion"];
   /* the fourth Thursday of November */
   const thanksgiving = y => { const d = new Date(y, 10, 1).getDay(); return 1 + ((4 - d + 7) % 7) + 21; };
+  /* each holiday shows for the five days leading up to it and on the day itself */
+  const LEAD_DAYS = 5;
+  const EVENTS = [["halloween", y => [9, 31]], ["turkey", y => [10, thanksgiving(y)]], ["tree", y => [11, 25]], ["newyear", y => [0, 1]]];
+  const dayOf = (y, m, d) => Date.UTC(y, m, d) / 864e5;
   function pick(date) {
-    const y = date.getFullYear(), m = date.getMonth(), d = date.getDate();
-    if (m === 9 && d >= 15) return "halloween";
-    if (m === 10) {
-      /* the turkey from the first of November to the Sunday after Thanksgiving */
-      if (d <= thanksgiving(y) + 3) return "turkey";
-      return "tree";
+    const y = date.getFullYear(), m = date.getMonth(), d = date.getDate(), today = dayOf(y, m, d);
+    /* next year's dates too, so late December counts down to the first of January */
+    for (const [name, at] of EVENTS) for (const yy of [y, y + 1]) {
+      const [em, ed] = at(yy), left = dayOf(yy, em, ed) - today;
+      if (left >= 0 && left <= LEAD_DAYS) return name;
     }
-    if (m === 11 && d <= 26) return "tree";
-    if ((m === 11 && d >= 27) || (m === 0 && d <= 2)) return "newyear";
     /* one animal a day, in turn */
-    const day = Math.floor((Date.UTC(y, m, d) - Date.UTC(y, 0, 0)) / 864e5);
+    const day = today - dayOf(y, 0, 0);
     return ANIMALS[(day + y) % ANIMALS.length];
   }
 
